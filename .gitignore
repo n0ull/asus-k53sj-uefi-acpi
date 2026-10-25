@@ -1,0 +1,42 @@
+# Local evidence, old experiments and private firmware dumps.
+/local/
+
+# Generated build and release artifacts.
+/build/
+/dist/
+**/__pycache__/
+*.pyc
+*.o
+*.so
+*.exe
+*.efi
+*.iso
+*.img
+*.fd
+*.log
+
+# Never accidentally add original firmware or raw recordings/dumps.
+*.315
+*.306
+*.rom
+*.bin
+*.mp4
+*.mov
+*.png
+*.jpg
+*.jpeg
+*.tar
+*.tar.gz
+*.zip
+
+# Editor/OS files.
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+K53SVAM-*.TXT

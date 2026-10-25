@@ -1,0 +1,318 @@
+--- a/init/main.c
++++ b/init/main.c
+@@ -121,6 +121,16 @@
+ 
+ static int kernel_init(void *);
+ 
++/* Temporary ordering experiment; opt-in from the diagnostic boot menu. */
++static bool __initdata k53diag_early_acpi;
++static int __init k53diag_early_acpi_setup(char *unused)
++{
++	k53diag_early_acpi = true;
++	return 1;
++}
++__setup("k53diag_early_acpi", k53diag_early_acpi_setup);
++
++
+ /*
+  * Debug helper: via this flag we know that we are in 'early bootup code'
+  * where only the boot processor is running with IRQ disabled.  This means
+@@ -1139,13 +1149,27 @@
+ #endif
+ 	setup_per_cpu_pageset();
+ 	numa_policy_init();
++	pr_emerg("K53DIAG M01 acpi_early_init ENTER\n");
+ 	acpi_early_init();
++	pr_emerg("K53DIAG M01 acpi_early_init RETURN\n");
++
++	if (k53diag_early_acpi && !acpi_disabled) {
++		acpi_status diag_status;
++
++		pr_emerg("K53DIAG P01 EARLY_ACPI before EFI runtime ENTER\n");
++		diag_status = acpi_enable();
++		pr_emerg("K53DIAG P01 EARLY_ACPI before EFI runtime RETURN status=%#x\n",
++			 diag_status);
++	}
++
+ 	if (late_time_init)
+ 		late_time_init();
+ 	sched_clock_init();
+ 	calibrate_delay();
+ 
++	pr_emerg("K53DIAG M02 arch_cpu_finalize_init ENTER\n");
+ 	arch_cpu_finalize_init();
++	pr_emerg("K53DIAG M02 arch_cpu_finalize_init RETURN\n");
+ 
+ 	pid_idr_init();
+ 	anon_vma_init();
+@@ -1159,25 +1183,57 @@
+ 	security_init();
+ 	dbg_late_init();
+ 	net_ns_init();
++	pr_emerg("K53DIAG M03 vfs_caches_init ENTER\n");
+ 	vfs_caches_init();
++	pr_emerg("K53DIAG M03 vfs_caches_init RETURN\n");
++	pr_emerg("K53DIAG M04 pagecache_init ENTER\n");
+ 	pagecache_init();
++	pr_emerg("K53DIAG M04 pagecache_init RETURN\n");
++	pr_emerg("K53DIAG M05 signals_init ENTER\n");
+ 	signals_init();
++	pr_emerg("K53DIAG M05 signals_init RETURN\n");
++	pr_emerg("K53DIAG M06 seq_file_init ENTER\n");
+ 	seq_file_init();
++	pr_emerg("K53DIAG M06 seq_file_init RETURN\n");
++	pr_emerg("K53DIAG M07 proc_root_init ENTER\n");
+ 	proc_root_init();
++	pr_emerg("K53DIAG M07 proc_root_init RETURN\n");
++	pr_emerg("K53DIAG M08 nsfs_init ENTER\n");
+ 	nsfs_init();
++	pr_emerg("K53DIAG M08 nsfs_init RETURN\n");
++	pr_emerg("K53DIAG M09 pidfs_init ENTER\n");
+ 	pidfs_init();
++	pr_emerg("K53DIAG M09 pidfs_init RETURN\n");
++	pr_emerg("K53DIAG M10 cpuset_init ENTER\n");
+ 	cpuset_init();
++	pr_emerg("K53DIAG M10 cpuset_init RETURN\n");
++	pr_emerg("K53DIAG M11 mem_cgroup_init ENTER\n");
+ 	mem_cgroup_init();
++	pr_emerg("K53DIAG M11 mem_cgroup_init RETURN\n");
++	pr_emerg("K53DIAG M12 cgroup_init ENTER\n");
+ 	cgroup_init();
++	pr_emerg("K53DIAG M12 cgroup_init RETURN\n");
++	pr_emerg("K53DIAG M13 taskstats_init_early ENTER\n");
+ 	taskstats_init_early();
++	pr_emerg("K53DIAG M13 taskstats_init_early RETURN\n");
++	pr_emerg("K53DIAG M14 delayacct_init ENTER\n");
+ 	delayacct_init();
+-
++	pr_emerg("K53DIAG M14 delayacct_init RETURN\n");
++
++	pr_emerg("K53DIAG M15 acpi_subsystem_init ENTER\n");
+ 	acpi_subsystem_init();
++	pr_emerg("K53DIAG M15 acpi_subsystem_init RETURN\n");
++	pr_emerg("K53DIAG M16 arch_post_acpi_subsys_init ENTER\n");
+ 	arch_post_acpi_subsys_init();
++	pr_emerg("K53DIAG M16 arch_post_acpi_subsys_init RETURN\n");
++	pr_emerg("K53DIAG M17 kcsan_init ENTER\n");
+ 	kcsan_init();
++	pr_emerg("K53DIAG M17 kcsan_init RETURN\n");
+ 
+ 	/* Do the rest non-__init'ed, we're now alive */
++	pr_emerg("K53DIAG M18 rest_init ENTER\n");
+ 	rest_init();
++	pr_emerg("K53DIAG M18 rest_init RETURN\n");
+ 
+ 	/*
+ 	 * Avoid stack canaries in callers of boot_init_stack_canary for gcc-10
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -6224,21 +6224,31 @@
+ 	 * namespace in existence and the initial mount namespace is
+ 	 * completely empty until we add the mounts we just created.
+ 	 */
++	pr_emerg("K53DIAG V01 mount-tree traversal ENTER\n");
+ 	for (struct mount *p = mnt_root; p; p = next_mnt(p, mnt_root)) {
++		pr_emerg("K53DIAG V01 mount-tree node\n");
+ 		mnt_add_to_ns(&init_mnt_ns, p);
+ 		init_mnt_ns.nr_mounts++;
+ 	}
+ 
+ 	init_task.nsproxy->mnt_ns = &init_mnt_ns;
++	pr_emerg("K53DIAG V02 get_mnt_ns ENTER\n");
+ 	get_mnt_ns(&init_mnt_ns);
++	pr_emerg("K53DIAG V02 get_mnt_ns RETURN\n");
+ 
+ 	/* The root and pwd always point to the mutable rootfs. */
+ 	root.mnt	= mnt;
+ 	root.dentry	= mnt->mnt_root;
++	pr_emerg("K53DIAG V03 set_fs_pwd ENTER\n");
+ 	set_fs_pwd(current->fs, &root);
++	pr_emerg("K53DIAG V03 set_fs_pwd RETURN\n");
++	pr_emerg("K53DIAG V04 set_fs_root ENTER\n");
+ 	set_fs_root(current->fs, &root);
+-
++	pr_emerg("K53DIAG V04 set_fs_root RETURN\n");
++
++	pr_emerg("K53DIAG V05 ns_tree_add ENTER\n");
+ 	ns_tree_add(&init_mnt_ns);
++	pr_emerg("K53DIAG V05 ns_tree_add RETURN\n");
+ }
+ 
+ void __init mnt_init(void)
+--- a/drivers/acpi/bus.c
++++ b/drivers/acpi/bus.c
+@@ -1476,7 +1476,9 @@
+ 	if (acpi_disabled)
+ 		return;
+ 
++	pr_emerg("K53DIAG A01 acpi_enable_subsystem ENTER\n");
+ 	status = acpi_enable_subsystem(~ACPI_NO_ACPI_ENABLE);
++	pr_emerg("K53DIAG A01 acpi_enable_subsystem RETURN\n");
+ 	if (ACPI_FAILURE(status)) {
+ 		pr_err("Unable to enable ACPI\n");
+ 		disable_acpi();
+--- a/drivers/acpi/acpica/utxfinit.c
++++ b/drivers/acpi/acpica/utxfinit.c
+@@ -125,7 +125,9 @@
+ 	 * Global Lock and the Firmware Waking Vector
+ 	 */
+ 	if (!(flags & ACPI_NO_FACS_INIT)) {
++		acpi_os_printf("K53DIAG A02 initialize_facs ENTER\n");
+ 		status = acpi_tb_initialize_facs();
++		acpi_os_printf("K53DIAG A02 initialize_facs RETURN\n");
+ 		if (ACPI_FAILURE(status)) {
+ 			ACPI_WARNING((AE_INFO, "Could not map the FACS table"));
+ 			return_ACPI_STATUS(status);
+@@ -140,9 +142,13 @@
+ 		ACPI_DEBUG_PRINT((ACPI_DB_EXEC,
+ 				  "[Init] Going into ACPI mode\n"));
+ 
++		acpi_os_printf("K53DIAG A03 read_original_acpi_mode ENTER\n");
+ 		acpi_gbl_original_mode = acpi_hw_get_mode();
+-
++		acpi_os_printf("K53DIAG A03 read_original_acpi_mode RETURN\n");
++
++		acpi_os_printf("K53DIAG A04 acpi_enable ENTER\n");
+ 		status = acpi_enable();
++		acpi_os_printf("K53DIAG A04 acpi_enable RETURN\n");
+ 		if (ACPI_FAILURE(status)) {
+ 			ACPI_WARNING((AE_INFO, "AcpiEnable failed"));
+ 			return_ACPI_STATUS(status);
+@@ -167,7 +173,9 @@
+ 		ACPI_DEBUG_PRINT((ACPI_DB_EXEC,
+ 				  "[Init] Initializing ACPI events\n"));
+ 
++		acpi_os_printf("K53DIAG A05 initialize_events ENTER\n");
+ 		status = acpi_ev_initialize_events();
++		acpi_os_printf("K53DIAG A05 initialize_events RETURN\n");
+ 		if (ACPI_FAILURE(status)) {
+ 			return_ACPI_STATUS(status);
+ 		}
+@@ -181,7 +189,9 @@
+ 		ACPI_DEBUG_PRINT((ACPI_DB_EXEC,
+ 				  "[Init] Installing SCI/GL handlers\n"));
+ 
++		acpi_os_printf("K53DIAG A06 install_xrupt_handlers ENTER\n");
+ 		status = acpi_ev_install_xrupt_handlers();
++		acpi_os_printf("K53DIAG A06 install_xrupt_handlers RETURN\n");
+ 		if (ACPI_FAILURE(status)) {
+ 			return_ACPI_STATUS(status);
+ 		}
+--- a/drivers/acpi/acpica/evxfevnt.c
++++ b/drivers/acpi/acpica/evxfevnt.c
+@@ -57,7 +57,9 @@
+ 
+ 	/* Transition to ACPI mode */
+ 
++	acpi_os_printf("K53DIAG A07 set_acpi_mode ENTER\n");
+ 	status = acpi_hw_set_mode(ACPI_SYS_MODE_ACPI);
++	acpi_os_printf("K53DIAG A07 set_acpi_mode RETURN\n");
+ 	if (ACPI_FAILURE(status)) {
+ 		ACPI_ERROR((AE_INFO,
+ 			    "Could not transition to ACPI mode"));
+--- a/drivers/acpi/acpica/hwacpi.c
++++ b/drivers/acpi/acpica/hwacpi.c
+@@ -67,8 +67,10 @@
+ 
+ 		/* BIOS should have disabled ALL fixed and GP events */
+ 
++		acpi_os_printf("K53DIAG A08 SMI_ACPI_ENABLE_write ENTER\n");
+ 		status = acpi_hw_write_port(acpi_gbl_FADT.smi_command,
+ 					    (u32) acpi_gbl_FADT.acpi_enable, 8);
++		acpi_os_printf("K53DIAG A08 SMI_ACPI_ENABLE_write RETURN\n");
+ 		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+ 				  "Attempting to enable ACPI mode\n"));
+ 		break;
+--- a/arch/x86/platform/efi/efi.c
++++ b/arch/x86/platform/efi/efi.c
+@@ -793,8 +793,12 @@
+ 		goto err;
+ 	}
+ 
++	pr_emerg("K53DIAG E01 merge_regions ENTER\n");
+ 	efi_merge_regions();
++	pr_emerg("K53DIAG E01 merge_regions RETURN\n");
++	pr_emerg("K53DIAG E02 map_regions ENTER\n");
+ 	new_memmap = efi_map_regions(&count, &pg_shift);
++	pr_emerg("K53DIAG E02 map_regions RETURN\n");
+ 	if (!new_memmap) {
+ 		pr_err("Error reallocating memory, EFI runtime non-functional!\n");
+ 		goto err;
+@@ -822,21 +826,29 @@
+ 	if (efi_setup_page_tables(pa, 1 << pg_shift))
+ 		goto err;
+ 
++	pr_emerg("K53DIAG E04 sync_low_mappings ENTER\n");
+ 	efi_sync_low_kernel_mappings();
+-
++	pr_emerg("K53DIAG E04 sync_low_mappings RETURN\n");
++
++	pr_emerg("K53DIAG E05 SetVirtualAddressMap ENTER\n");
+ 	status = efi_set_virtual_address_map(efi.memmap.desc_size * count,
+ 					     efi.memmap.desc_size,
+ 					     efi.memmap.desc_version,
+ 					     (efi_memory_desc_t *)pa,
+ 					     efi_systab_phys);
++	pr_emerg("K53DIAG E05 SetVirtualAddressMap RETURN\n");
+ 	if (status != EFI_SUCCESS) {
+ 		pr_err("Unable to switch EFI into virtual mode (status=%lx)!\n",
+ 		       status);
+ 		goto err;
+ 	}
+ 
++	pr_emerg("K53DIAG E06 embedded_firmwares ENTER\n");
+ 	efi_check_for_embedded_firmwares();
++	pr_emerg("K53DIAG E06 embedded_firmwares RETURN\n");
++	pr_emerg("K53DIAG E07 unmap_boot_services ENTER\n");
+ 	efi_unmap_boot_services();
++	pr_emerg("K53DIAG E07 unmap_boot_services RETURN\n");
+ 
+ 	if (!efi_is_mixed())
+ 		efi_native_runtime_setup();
+@@ -848,10 +860,14 @@
+ 	 * SVAM() has been called and the firmware has performed all
+ 	 * necessary relocation fixups for the new virtual addresses.
+ 	 */
++	pr_emerg("K53DIAG E08 runtime_update_mappings ENTER\n");
+ 	efi_runtime_update_mappings();
++	pr_emerg("K53DIAG E08 runtime_update_mappings RETURN\n");
+ 
+ 	/* clean DUMMY object */
++	pr_emerg("K53DIAG E09 delete_dummy_variable ENTER\n");
+ 	efi_delete_dummy_variable();
++	pr_emerg("K53DIAG E09 delete_dummy_variable RETURN\n");
+ 	return;
+ 
+ err:
+--- a/drivers/acpi/osl.c
++++ b/drivers/acpi/osl.c
+@@ -704,11 +704,29 @@
+ 		return AE_NOT_IMPLEMENTED;
+ 
+ 	if (width <= 8) {
++		if (port == 0xb2)
++			pr_emerg("K53DIAG IO outb port=%#llx value=%#x width=%u ENTER\n",
++				 (unsigned long long)port, value, width);
+ 		outb(value, port);
++		if (port == 0xb2)
++			pr_emerg("K53DIAG IO outb port=%#llx RETURN\n",
++				 (unsigned long long)port);
+ 	} else if (width <= 16) {
++		if (port == 0xb2)
++			pr_emerg("K53DIAG IO outw port=%#llx value=%#x width=%u ENTER\n",
++				 (unsigned long long)port, value, width);
+ 		outw(value, port);
++		if (port == 0xb2)
++			pr_emerg("K53DIAG IO outw port=%#llx RETURN\n",
++				 (unsigned long long)port);
+ 	} else if (width <= 32) {
++		if (port == 0xb2)
++			pr_emerg("K53DIAG IO outl port=%#llx value=%#x width=%u ENTER\n",
++				 (unsigned long long)port, value, width);
+ 		outl(value, port);
++		if (port == 0xb2)
++			pr_emerg("K53DIAG IO outl port=%#llx RETURN\n",
++				 (unsigned long long)port);
+ 	} else {
+ 		pr_debug("%s: Access width %d not supported\n", __func__, width);
+ 		return AE_BAD_PARAMETER;

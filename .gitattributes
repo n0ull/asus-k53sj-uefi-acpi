@@ -1,0 +1,15 @@
+* text=auto eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.cfg text eol=lf
+*.config text eol=lf
+*.patch text eol=lf
+*.md text eol=lf
+Makefile text eol=lf
+*.efi binary
+*.iso binary
+# Preserve whitespace in upstream notices and unified-diff context lines.
+LICENSES/* -whitespace
+research/linux/patches/*.patch -whitespace

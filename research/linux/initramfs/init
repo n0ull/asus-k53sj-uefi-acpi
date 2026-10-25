@@ -1,0 +1,30 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts /run /tmp /mnt/usb
+mount -t devpts devpts /dev/pts
+mount -t tmpfs tmpfs /tmp
+echo /bin/mdev > /proc/sys/kernel/hotplug
+mdev -s
+mkdir -p /tmp/k53diag
+cat /proc/cmdline > /tmp/k53diag/cmdline.txt
+dmesg > /tmp/k53diag/dmesg.txt
+cat /proc/iomem > /tmp/k53diag/iomem.txt
+for name in fw_platform_size fw_vendor runtime config_table systab; do
+    if [ -r "/sys/firmware/efi/$name" ]; then
+        cat "/sys/firmware/efi/$name" > "/tmp/k53diag/efi-$name.txt"
+    fi
+done
+if [ -d /sys/firmware/acpi/tables ]; then
+    tar -chf /tmp/k53diag/acpi-tables.tar -C /sys/firmware/acpi tables
+fi
+tar -czf /tmp/k53diag.tar.gz -C /tmp k53diag
+echo 'K53DIAG USERSPACE READY: diagnostic initramfs reached' > /dev/kmsg
+printf '\nK53SJ diagnostic shell. No disk has been mounted or modified.\n'
+printf 'Logs: /tmp/k53diag.tar.gz\n'
+printf 'Save to a separately mounted FAT/exFAT USB: diag-save /mnt/usb\n'
+printf 'Otherwise photograph the last K53DIAG ENTER/RETURN lines.\n\n'
+exec setsid cttyhack sh
